@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ordersApi, productsApi, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { computeEffectiveUnitPrice, useCart } from "@/lib/cart";
+import { useCurrency } from "@/lib/currency";
 import type { FulfillmentType, PaymentMethod, Product } from "@/lib/types";
 
 const CATEGORIES = ["", "Tomatoes", "Cucumbers", "Potatoes", "Greens", "Fruits", "Onions"];
@@ -15,6 +16,7 @@ export default function CatalogPage() {
   const { user } = useAuth();
   const { items, farmerGroups, totalKg, subtotal, addItem, updateQuantity, removeItem, clearCart } =
     useCart();
+  const { formatPrice } = useCurrency();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
@@ -107,13 +109,13 @@ export default function CatalogPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-[#95D5B2]">
-                Farm-Gate Direct • Next-Morning Milk-Run (06:00–10:00)
+                First-Hand Farm-Gate Prices • Direct From Regional Producers
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-                Fresh Local Produce for Kitchens
+                Buy Direct at First-Hand Farmer Prices
               </h1>
               <p className="mt-1.5 text-sm text-[#D8F3DC]">
-                Order directly from verified regional farms before the 19:00 daily cutoff. One consolidated morning delivery and invoice.
+                Zero middleman markup — pay the exact farm-gate wholesale price farmers sell at the field/orchard gate, delivered in one consolidated morning Milk-Run (06:00–10:00).
               </p>
             </div>
             {!user && (
@@ -258,14 +260,18 @@ export default function CatalogPage() {
                           {product.farmer?.region ? ` • ${product.farmer.region}` : ""}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-[#1B4332]">
-                          ${unitPrice.toFixed(2)}
+                      <div className="shrink-0 text-right">
+                        <p className="whitespace-nowrap text-xl font-bold text-[#1B4332]">
+                          {formatPrice(unitPrice)}
                           <span className="text-xs font-normal text-stone-500">/kg</span>
                         </p>
-                        {unitPrice < product.basePricePerKg && (
-                          <p className="text-[11px] text-emerald-700">
-                            Tier applied (base ${product.basePricePerKg.toFixed(2)})
+                        {unitPrice < product.basePricePerKg ? (
+                          <p className="whitespace-nowrap text-[11px] font-medium text-emerald-700">
+                            Tier applied (base {formatPrice(product.basePricePerKg)})
+                          </p>
+                        ) : (
+                          <p className="whitespace-nowrap text-[11px] text-stone-400">
+                            Farm-gate rate
                           </p>
                         )}
                       </div>
@@ -298,14 +304,17 @@ export default function CatalogPage() {
 
                     {product.priceTiers.length > 0 && (
                       <div className="mt-3 rounded-xl bg-[#F7FAF8] p-2.5 text-xs">
-                        <p className="font-semibold text-[#1B4332]">Volume Pricing</p>
+                        <p className="font-semibold text-[#1B4332]">
+                          Bulk Farm-Gate Volume Tiers
+                        </p>
                         <div className="mt-1 flex flex-wrap gap-2">
                           {product.priceTiers.map((tier, idx) => (
                             <span
                               key={tier.id ?? idx}
-                              className="rounded border border-[#D4DFD7] bg-white px-2 py-0.5"
+                              className="whitespace-nowrap rounded border border-[#D4DFD7] bg-white px-2 py-0.5"
                             >
-                              {tier.minQuantityKg}+ kg → <strong>${tier.pricePerKg.toFixed(2)}/kg</strong>
+                              {tier.minQuantityKg}+ kg →{" "}
+                              <strong>{formatPrice(tier.pricePerKg)}/kg</strong>
                             </span>
                           ))}
                         </div>
@@ -375,12 +384,19 @@ export default function CatalogPage() {
       {/* Right: Multi-Farmer Milk-Run Cart Preview */}
       <aside id="cart" className="lg:col-span-4">
         <div className="sticky top-20 rounded-2xl border border-[#DCE6DF] bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between border-b border-[#F0F3F1] pb-3">
+          <div className="flex items-start justify-between gap-2 border-b border-[#F0F3F1] pb-3.5">
             <div>
-              <h2 className="text-lg font-bold text-[#1B4332]">Morning Cart</h2>
-              <p className="text-xs text-stone-500">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-[#1B4332]">Morning Cart</h2>
+                {items.length > 0 && (
+                  <span className="whitespace-nowrap rounded-full bg-[#D8F3DC] px-2.5 py-0.5 text-xs font-bold text-[#1B4332]">
+                    {items.length} {items.length === 1 ? "item" : "items"} • {totalKg} kg
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-stone-500">
                 {farmerGroups.length === 0
-                  ? "Multi-farmer orders group into 1 delivery"
+                  ? "Multi-farmer orders group into 1 morning delivery"
                   : `${farmerGroups.length} farm${farmerGroups.length > 1 ? "s" : ""} → 1 consolidated milk-run`}
               </p>
             </div>
@@ -388,9 +404,9 @@ export default function CatalogPage() {
               <button
                 type="button"
                 onClick={clearCart}
-                className="text-xs font-medium text-red-600 hover:underline"
+                className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
               >
-                Clear
+                Clear all
               </button>
             )}
           </div>
@@ -400,54 +416,67 @@ export default function CatalogPage() {
               Add produce from verified farms to preview your consolidated morning order.
             </div>
           ) : (
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 space-y-3.5">
               {farmerGroups.map((group) => (
                 <div
                   key={group.farmerId}
                   className="rounded-xl border border-[#E2E8E4] bg-[#FAF9F6] p-3"
                 >
-                  <div className="flex items-center justify-between text-xs font-semibold text-[#1B4332]">
-                    <span>
+                  <div className="flex items-center justify-between gap-2 border-b border-[#E8EFEA] pb-2 text-xs font-semibold text-[#1B4332]">
+                    <span className="truncate">
                       {group.farmerName}
-                      {group.region ? ` (${group.region})` : ""}
+                      {group.region ? ` • ${group.region}` : ""}
                     </span>
-                    <span>${group.subtotal.toFixed(2)}</span>
+                    <span className="shrink-0 whitespace-nowrap font-bold">
+                      {formatPrice(group.subtotal)}
+                    </span>
                   </div>
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2.5 space-y-2">
                     {group.items.map((item) => (
                       <div
                         key={item.product.id}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-white p-2 text-xs"
+                        className="rounded-xl border border-[#E8EFEA] bg-white p-2.5 text-xs shadow-2xs"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold text-[#1F2933]">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-[#1F2933]">
                             {item.product.title}
                           </p>
-                          <p className="text-stone-500">
-                            ${item.unitPrice.toFixed(2)}/kg • Line ${item.lineTotal.toFixed(2)}
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.product.id)}
+                            className="shrink-0 rounded px-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                            title="Remove item"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <input
-                          type="number"
-                          min={item.product.minOrderKg}
-                          max={item.product.availableStockKg}
-                          value={item.quantityKg}
-                          onChange={(e) =>
-                            updateQuantity(
-                              item.product.id,
-                              Number(e.target.value) || item.product.minOrderKg
-                            )
-                          }
-                          className="w-16 rounded border border-[#D4DFD7] px-2 py-1 text-right"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.product.id)}
-                          className="px-1 text-stone-400 hover:text-red-600"
-                          title="Remove"
-                        >
-                          ✕
-                        </button>
+
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="whitespace-nowrap text-stone-500">
+                            {formatPrice(item.unitPrice)}/kg
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={item.product.minOrderKg}
+                              max={item.product.availableStockKg}
+                              value={item.quantityKg}
+                              onChange={(e) =>
+                                updateQuantity(
+                                  item.product.id,
+                                  Number(e.target.value) || item.product.minOrderKg
+                                )
+                              }
+                              className="w-16 rounded-lg border border-[#D4DFD7] px-2 py-1 text-right font-semibold text-[#1F2933] focus:border-[#1B4332] focus:outline-none"
+                            />
+                            <span className="text-stone-500">kg</span>
+                          </div>
+
+                          <span className="whitespace-nowrap font-bold text-[#1B4332]">
+                            {formatPrice(item.lineTotal)}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -455,13 +484,15 @@ export default function CatalogPage() {
               ))}
 
               <div className="space-y-3 border-t border-[#E2E8E4] pt-4 text-sm">
-                <div className="flex justify-between text-stone-600">
+                <div className="flex items-center justify-between text-xs text-stone-600">
                   <span>Total Weight</span>
-                  <span className="font-semibold">{totalKg} kg</span>
+                  <span className="whitespace-nowrap font-semibold text-[#1F2933]">
+                    {totalKg} kg
+                  </span>
                 </div>
-                <div className="flex justify-between text-base font-bold text-[#1B4332]">
+                <div className="flex items-center justify-between text-base font-bold text-[#1B4332]">
                   <span>Estimated Produce Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span className="whitespace-nowrap">{formatPrice(subtotal)}</span>
                 </div>
 
                 <div>
@@ -489,7 +520,7 @@ export default function CatalogPage() {
                     >
                       <option value="PlatformCourier">Morning Milk-Run</option>
                       <option value="FarmerDelivery">Farmer Delivery</option>
-                      <option value="BuyerPickup">Buyer Pickup ($0 fee)</option>
+                      <option value="BuyerPickup">Buyer Pickup (Free)</option>
                     </select>
                   </div>
                   <div>

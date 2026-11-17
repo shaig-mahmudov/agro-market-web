@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { adminApi, ApiError, ordersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCurrency } from "@/lib/currency";
 import type { CheckoutGroup, Order, PaymentMethod, PaymentStatus } from "@/lib/types";
 
 export default function OrdersPage() {
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   const [groups, setGroups] = useState<CheckoutGroup[]>([]);
   const [farmerOrders, setFarmerOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,11 +273,11 @@ export default function OrdersPage() {
                   {order.items.map((item) => (
                     <div key={item.id} className="flex justify-between py-1.5">
                       <span>
-                        {item.productTitleSnapshot} ({item.estimatedWeightKg} kg × $
-                        {item.unitPriceApplied.toFixed(2)})
+                        {item.productTitleSnapshot} ({item.estimatedWeightKg} kg ×{" "}
+                        {formatPrice(item.unitPriceApplied)})
                       </span>
                       <span className="font-semibold">
-                        ${(item.estimatedWeightKg * item.unitPriceApplied).toFixed(2)}
+                        {formatPrice(item.estimatedWeightKg * item.unitPriceApplied)}
                       </span>
                     </div>
                   ))}
@@ -419,10 +421,9 @@ export default function OrdersPage() {
       ) : (
         <div className="space-y-5">
           {groups.map((group) => {
-            const grandTotal = group.orders
+            const grandTotalUsd = group.orders
               .filter((o) => o.status !== "Cancelled")
-              .reduce((acc, o) => acc + o.finalTotalAmount, 0)
-              .toFixed(2);
+              .reduce((acc, o) => acc + o.finalTotalAmount, 0);
 
             return (
               <section
@@ -435,11 +436,11 @@ export default function OrdersPage() {
                       Scheduled Morning Delivery: {group.scheduledDeliveryDate}
                     </p>
                     <h2 className="text-lg font-bold text-[#1B4332]">
-                      Checkout #{group.id.slice(0, 8)} — ${grandTotal}
+                      Checkout #{group.id.slice(0, 8)} — {formatPrice(grandTotalUsd)}
                     </h2>
                     <p className="text-xs text-stone-500">
-                      Deliver to: {group.deliveryAddress} • Delivery Fee: $
-                      {group.totalDeliveryFee.toFixed(2)}
+                      Deliver to: {group.deliveryAddress} • Delivery Fee:{" "}
+                      {formatPrice(group.totalDeliveryFee)}
                     </p>
                   </div>
 
@@ -526,10 +527,10 @@ export default function OrdersPage() {
                                     {(item.rejectedWeightKg ?? 0) > 0
                                       ? `, Rej ${item.rejectedWeightKg} kg`
                                       : ""}{" "}
-                                    @ ${item.unitPriceApplied.toFixed(2)}/kg)
+                                    @ {formatPrice(item.unitPriceApplied)}/kg)
                                   </span>
                                   <span className="font-semibold">
-                                    ${(chargeableKg * item.unitPriceApplied).toFixed(2)}
+                                    {formatPrice(chargeableKg * item.unitPriceApplied)}
                                   </span>
                                 </div>
                                 {item.proofPhotoUrl && (
@@ -549,10 +550,10 @@ export default function OrdersPage() {
 
                         <div className="mt-2 flex justify-between border-t border-[#E2E8E4] pt-2 font-semibold text-[#1B4332]">
                           <span>
-                            Final Total (incl. ${order.platformFeeAmount.toFixed(2)} fee + $
-                            {order.deliveryFeeAmount.toFixed(2)} deliv.)
+                            Final Total (incl. {formatPrice(order.platformFeeAmount)} fee +{" "}
+                            {formatPrice(order.deliveryFeeAmount)} deliv.)
                           </span>
-                          <span>${order.finalTotalAmount.toFixed(2)}</span>
+                          <span>{formatPrice(order.finalTotalAmount)}</span>
                         </div>
 
                         {order.disputeNote && (
@@ -780,10 +781,10 @@ export default function OrdersPage() {
                                 <strong>{chargeableKg.toFixed(2)} kg</strong>
                               </td>
                               <td className="py-1.5 text-right text-stone-600">
-                                ${item.unitPriceApplied.toFixed(2)}/kg
+                                {formatPrice(item.unitPriceApplied)}/kg
                               </td>
                               <td className="py-1.5 text-right font-semibold">
-                                ${(chargeableKg * item.unitPriceApplied).toFixed(2)}
+                                {formatPrice(chargeableKg * item.unitPriceApplied)}
                               </td>
                             </tr>
                           );
@@ -793,11 +794,11 @@ export default function OrdersPage() {
 
                     <div className="mt-2 flex flex-wrap justify-between border-t border-[#F0F3F1] pt-2 text-[11px] text-stone-600">
                       <span>
-                        Platform Fee: ${order.platformFeeAmount.toFixed(2)} • Split Delivery Fee: $
-                        {order.deliveryFeeAmount.toFixed(2)}
+                        Platform Fee: {formatPrice(order.platformFeeAmount)} • Split Delivery Fee:{" "}
+                        {formatPrice(order.deliveryFeeAmount)}
                       </span>
                       <span className="font-bold text-[#1B4332]">
-                        Sub-Order Total: ${order.finalTotalAmount.toFixed(2)}
+                        Sub-Order Total: {formatPrice(order.finalTotalAmount)}
                       </span>
                     </div>
                   </div>
@@ -807,11 +808,11 @@ export default function OrdersPage() {
             <div className="mt-5 flex items-center justify-between border-t border-[#DCE6DF] pt-4 text-base font-bold text-[#1B4332]">
               <span>Consolidated Grand Total</span>
               <span>
-                $
-                {invoiceGroup.orders
-                  .filter((o) => o.status !== "Cancelled")
-                  .reduce((sum, o) => sum + o.finalTotalAmount, 0)
-                  .toFixed(2)}
+                {formatPrice(
+                  invoiceGroup.orders
+                    .filter((o) => o.status !== "Cancelled")
+                    .reduce((sum, o) => sum + o.finalTotalAmount, 0)
+                )}
               </span>
             </div>
           </div>

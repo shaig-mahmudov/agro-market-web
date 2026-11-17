@@ -8,6 +8,7 @@ import {
   ordersApi,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCurrency } from "@/lib/currency";
 import type {
   DeliveryRun,
   DeliveryRunOrderSummary,
@@ -31,6 +32,7 @@ const NEXT_STATUS_LABEL: Record<DeliveryRunStatus, string> = {
 
 export default function LogisticsPage() {
   const { user } = useAuth();
+  const { formatPrice } = useCurrency();
   const [runs, setRuns] = useState<DeliveryRun[]>([]);
   const [unassignedOrders, setUnassignedOrders] = useState<Order[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -296,8 +298,8 @@ export default function LogisticsPage() {
                         </p>
                         <p className="text-xs text-stone-500">
                           Order #{order.id.slice(0, 8)} •{" "}
-                          {order.items.reduce((s, i) => s + i.estimatedWeightKg, 0)} kg • $
-                          {order.finalTotalAmount.toFixed(2)} ({order.fulfillmentType})
+                          {order.items.reduce((s, i) => s + i.estimatedWeightKg, 0)} kg •{" "}
+                          {formatPrice(order.finalTotalAmount)} ({order.fulfillmentType})
                         </p>
                       </div>
                     </label>
@@ -420,7 +422,7 @@ export default function LogisticsPage() {
                             </p>
                             <p className="text-xs text-stone-500">
                               Order #{order.id.slice(0, 8)} • Est {order.totalEstimatedWeightKg} kg
-                              {" "}• Final ${order.finalTotalAmount.toFixed(2)}
+                              {" "}• Final {formatPrice(order.finalTotalAmount)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -462,7 +464,7 @@ export default function LogisticsPage() {
                                       {item.productTitleSnapshot}
                                     </p>
                                     <p className="text-stone-500">
-                                      Est: {est} kg @ ${item.unitPriceApplied.toFixed(2)}/kg
+                                      Est: {est} kg @ {formatPrice(item.unitPriceApplied)}/kg
                                     </p>
                                     {flagged && (
                                       <p className="mt-0.5 font-semibold text-amber-700">

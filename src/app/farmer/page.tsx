@@ -4,10 +4,13 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, productsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCurrency } from "@/lib/currency";
 import type { Product } from "@/lib/types";
 
 export default function FarmerHubPage() {
   const { user } = useAuth();
+  const { config: currencyConfig, formatPrice, toDisplayAmount, fromDisplayAmount } =
+    useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,10 +19,10 @@ export default function FarmerHubPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [availableStockKg, setAvailableStockKg] = useState("150");
-  const [minOrderKg, setMinOrderKg] = useState("10");
-  const [basePricePerKg, setBasePricePerKg] = useState("2.40");
+  const [minOrderKg, setMinOrderKg] = useState("15");
+  const [basePricePerKg, setBasePricePerKg] = useState("0.85");
   const [tiers, setTiers] = useState<{ minKg: string; price: string }[]>([
-    { minKg: "50", price: "2.00" },
+    { minKg: "50", price: "0.75" },
   ]);
   const [variety, setVariety] = useState("");
   const [harvestDate, setHarvestDate] = useState("");
@@ -97,7 +100,10 @@ export default function FarmerHubPage() {
     try {
       const priceTiers = tiers
         .filter((t) => Number(t.minKg) > 0 && Number(t.price) > 0)
-        .map((t) => ({ minQuantityKg: Number(t.minKg), pricePerKg: Number(t.price) }));
+        .map((t) => ({
+          minQuantityKg: Number(t.minKg),
+          pricePerKg: fromDisplayAmount(Number(t.price)),
+        }));
 
       await productsApi.create({
         category,
@@ -105,7 +111,7 @@ export default function FarmerHubPage() {
         description: description || undefined,
         availableStockKg: Number(availableStockKg),
         minOrderKg: Number(minOrderKg),
-        basePricePerKg: Number(basePricePerKg),
+        basePricePerKg: fromDisplayAmount(Number(basePricePerKg)),
         metadata: {
           variety: variety || null,
           harvestDate: harvestDate || null,
@@ -137,12 +143,12 @@ export default function FarmerHubPage() {
     setEditTitle(product.title);
     setEditStockKg(String(product.availableStockKg));
     setEditMinOrderKg(String(product.minOrderKg));
-    setEditBasePrice(String(product.basePricePerKg));
+    setEditBasePrice(String(toDisplayAmount(product.basePricePerKg)));
     setEditImageUrls(product.imageUrls ? [...product.imageUrls] : []);
     setEditTiers(
       product.priceTiers.map((t) => ({
         minKg: String(t.minQuantityKg),
-        price: String(t.pricePerKg),
+        price: String(toDisplayAmount(t.pricePerKg)),
       }))
     );
   }
@@ -153,13 +159,16 @@ export default function FarmerHubPage() {
     try {
       const priceTiers = editTiers
         .filter((t) => Number(t.minKg) > 0 && Number(t.price) > 0)
-        .map((t) => ({ minQuantityKg: Number(t.minKg), pricePerKg: Number(t.price) }));
+        .map((t) => ({
+          minQuantityKg: Number(t.minKg),
+          pricePerKg: fromDisplayAmount(Number(t.price)),
+        }));
 
       await productsApi.update(product.id, {
         title: editTitle.trim() || product.title,
         availableStockKg: Number(editStockKg),
         minOrderKg: Number(editMinOrderKg),
-        basePricePerKg: Number(editBasePrice),
+        basePricePerKg: fromDisplayAmount(Number(editBasePrice)),
         imageUrls: editImageUrls,
         priceTiers,
         rowVersion: product.rowVersion,
@@ -322,7 +331,9 @@ export default function FarmerHubPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-stone-700">Base $/kg</label>
+                <label className="block text-xs font-semibold text-stone-700">
+                  Base {currencyConfig.symbol}/kg
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -363,7 +374,7 @@ export default function FarmerHubPage() {
                   <input
                     type="number"
                     step="0.01"
-                    placeholder="$/kg (e.g. 2.00)"
+                    placeholder={`${currencyConfig.symbol}/kg`}
                     value={tier.price}
                     onChange={(e) =>
                       setTiers((prev) =>
@@ -516,13 +527,13 @@ export default function FarmerHubPage() {
                       </div>
                       <p className="mt-0.5 text-xs text-stone-500">
                         {p.category} • Stock: <strong>{p.availableStockKg} kg</strong> • Min:{" "}
-                        {p.minOrderKg} kg • Base: ${p.basePricePerKg.toFixed(2)}/kg
+                        {p.minOrderKg} kg • Base: {formatPrice(p.basePricePerKg)}/kg
                       </p>
                       {p.priceTiers.length > 0 && (
                         <p className="mt-0.5 text-[11px] text-[#2D6A4F]">
                           Tiers:{" "}
                           {p.priceTiers
-                            .map((t) => `${t.minQuantityKg}+ kg @ $${t.pricePerKg.toFixed(2)}`)
+                            .map((t) => `${t.minQuantityKg}+ kg @ ${formatPrice(t.pricePerKg)}`)
                             .join(" | ")}
                         </p>
                       )}
@@ -595,7 +606,9 @@ export default function FarmerHubPage() {
                           />
                         </label>
                         <label>
-                          <span className="font-semibold text-stone-700">Base $/kg</span>
+                          <span className="font-semibold text-stone-700">
+                            Base {currencyConfig.symbol}/kg
+                          </span>
                           <input
                             type="number"
                             step="0.01"
@@ -682,7 +695,7 @@ export default function FarmerHubPage() {
                           <input
                             type="number"
                             step="0.01"
-                            placeholder="$/kg"
+                            placeholder={`${currencyConfig.symbol}/kg`}
                             value={tier.price}
                             onChange={(e) =>
                               setEditTiers((prev) =>
