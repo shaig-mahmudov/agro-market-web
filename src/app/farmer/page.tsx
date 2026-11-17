@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ApiError, productsApi, uploadFileWithPresignedUrl } from "@/lib/api";
+import { ApiError, productsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Product } from "@/lib/types";
 
@@ -35,6 +35,8 @@ export default function FarmerHubPage() {
   const [editStockKg, setEditStockKg] = useState("");
   const [editMinOrderKg, setEditMinOrderKg] = useState("");
   const [editBasePrice, setEditBasePrice] = useState("");
+  const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
+  const [uploadingEditPhoto, setUploadingEditPhoto] = useState(false);
   const [editTiers, setEditTiers] = useState<{ minKg: string; price: string }[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -136,6 +138,7 @@ export default function FarmerHubPage() {
     setEditStockKg(String(product.availableStockKg));
     setEditMinOrderKg(String(product.minOrderKg));
     setEditBasePrice(String(product.basePricePerKg));
+    setEditImageUrls(product.imageUrls ? [...product.imageUrls] : []);
     setEditTiers(
       product.priceTiers.map((t) => ({
         minKg: String(t.minQuantityKg),
@@ -157,6 +160,7 @@ export default function FarmerHubPage() {
         availableStockKg: Number(editStockKg),
         minOrderKg: Number(editMinOrderKg),
         basePricePerKg: Number(editBasePrice),
+        imageUrls: editImageUrls,
         priceTiers,
         rowVersion: product.rowVersion,
       });
@@ -207,13 +211,26 @@ export default function FarmerHubPage() {
     setUploadingPhoto(true);
     setError(null);
     try {
-      const presign = await productsApi.createUploadUrl(file.name, file.type || "image/webp");
-      const publicUrl = await uploadFileWithPresignedUrl(presign, file);
-      setImageUrls((prev) => [...prev, publicUrl]);
+      const uploaded = await productsApi.uploadImage(file);
+      setImageUrls((prev) => [...prev, uploaded.url]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to upload produce photo.");
     } finally {
       setUploadingPhoto(false);
+    }
+  }
+
+  async function handleEditPhotoUpload(file: File | null) {
+    if (!file) return;
+    setUploadingEditPhoto(true);
+    setError(null);
+    try {
+      const uploaded = await productsApi.uploadImage(file);
+      setEditImageUrls((prev) => [...prev, uploaded.url]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to upload produce photo.");
+    } finally {
+      setUploadingEditPhoto(false);
     }
   }
 
@@ -403,22 +420,47 @@ export default function FarmerHubPage() {
 
             <div>
               <label className="block text-xs font-semibold text-stone-700">
-                Produce Photos (WebP / JPEG / PNG)
+                Produce Photos (PNG / JPG / JPEG / WebP → auto-converted to WebP)
               </label>
               <input
                 type="file"
-                accept="image/webp,image/jpeg,image/png"
-                disabled={uploadingPhoto || !user.isVerified}
-                onChange={(e) => void handlePhotoUpload(e.target.files?.[0] ?? null)}
+                accept="image/webp,image/jpeg,image/png,.png,.jpg,.jpeg,.webp"
+                disabled={uploadingPhoto || !user.isVerified || imageUrls.length >= 8}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void handlePhotoUpload(file);
+                }}
                 className="mt-1 w-full rounded-xl border border-[#D4DFD7] px-3 py-1.5 text-xs"
               />
               {uploadingPhoto && (
-                <p className="mt-1 text-xs text-stone-500">Uploading photo to R2...</p>
+                <p className="mt-1 text-xs text-stone-500">
+                  Converting image to WebP and uploading...
+                </p>
               )}
               {imageUrls.length > 0 && (
-                <p className="mt-1 text-xs font-medium text-[#2D6A4F]">
-                  Attached {imageUrls.length} photo(s)
-                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {imageUrls.map((url, idx) => (
+                    <div key={`${url}-${idx}`} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Produce preview ${idx + 1}`}
+                        className="h-14 w-14 rounded-lg border border-[#D4DFD7] object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImageUrls((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow"
+                        title="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -563,6 +605,50 @@ export default function FarmerHubPage() {
                           />
                         </label>
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="font-semibold text-[#1B4332]">
+                        Photos (PNG/JPG/JPEG → WebP)
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/webp,image/jpeg,image/png,.png,.jpg,.jpeg,.webp"
+                        disabled={uploadingEditPhoto || editImageUrls.length >= 8}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] ?? null;
+                          e.target.value = "";
+                          void handleEditPhotoUpload(file);
+                        }}
+                        className="w-full rounded-lg border border-[#D4DFD7] bg-white px-2.5 py-1 text-xs"
+                      />
+                      {uploadingEditPhoto && (
+                        <p className="text-stone-500">Converting to WebP & uploading...</p>
+                      )}
+                      {editImageUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {editImageUrls.map((url, idx) => (
+                            <div key={`${url}-${idx}`} className="relative">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`Listing photo ${idx + 1}`}
+                                className="h-12 w-12 rounded-lg border border-[#D4DFD7] object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditImageUrls((prev) => prev.filter((_, i) => i !== idx))
+                                }
+                                className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white"
+                                title="Remove photo"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">

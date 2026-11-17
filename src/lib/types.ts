@@ -105,12 +105,14 @@ export interface PagedResult<T> {
   hasNextPage: boolean;
 }
 
-export interface PresignedUploadResult {
-  objectKey: string;
-  uploadUrl: string;
-  publicUrl: string;
-  expiresAt: string;
-  isLocalStub: boolean;
+export interface MediaUploadResult {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  url: string;
 }
 
 export type FulfillmentType = "PlatformCourier" | "FarmerDelivery" | "BuyerPickup";

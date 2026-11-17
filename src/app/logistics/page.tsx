@@ -6,7 +6,6 @@ import {
   ApiError,
   logisticsApi,
   ordersApi,
-  uploadFileWithPresignedUrl,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type {
@@ -228,13 +227,8 @@ export default function LogisticsPage() {
     if (!file) return;
     setError(null);
     try {
-      const presign = await ordersApi.createProofUploadUrl(
-        orderId,
-        file.name,
-        file.type || "image/webp"
-      );
-      const publicUrl = await uploadFileWithPresignedUrl(presign, file);
-      updateDraftField(orderId, idx, "proofUrl", publicUrl);
+      const uploaded = await ordersApi.uploadProofPhoto(orderId, file);
+      updateDraftField(orderId, idx, "proofUrl", uploaded.url);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to upload scale proof photo.");
     }

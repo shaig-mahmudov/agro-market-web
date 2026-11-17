@@ -10,7 +10,7 @@ import type {
   PagedResult,
   PaymentMethod,
   PaymentStatus,
-  PresignedUploadResult,
+  MediaUploadResult,
   Product,
   ProductMetadata,
   ProfileResponse,
@@ -128,21 +128,107 @@ export async function apiFetch<T>(
   return (await res.json()) as T;
 }
 
-export async function uploadFileWithPresignedUrl(
-  presign: PresignedUploadResult,
+export async function convertImageToWebp(
+  file: File,
+  maxDimension = 1600,
+  quality = 0.82
+): Promise<File> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return file;
+  }
+
+  return new Promise<File>((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+
+      if (width <= 0 || height <= 0) {
+        resolve(file);
+        return;
+      }
+
+      if (width > maxDimension || height > maxDimension) {
+        const scale = Math.min(maxDimension / width, maxDimension / height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const baseName = file.name.replace(/\.[^/.]+$/, "") || "image";
+          const webpFile = new File([blob], `${baseName}.webp`, {
+            type: "image/webp",
+            lastModified: Date.now(),
+          });
+          resolve(webpFile);
+        },
+        "image/webp",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+export async function uploadMultipartImage(
+  path: string,
   file: File
-): Promise<string> {
-  if (!presign.isLocalStub) {
-    const putRes = await fetch(presign.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
+): Promise<MediaUploadResult> {
+  const webpFile = await convertImageToWebp(file);
+  const { accessToken } = getStoredTokens();
+
+  const sendUpload = async (token: string | null) => {
+    const formData = new FormData();
+    formData.append("file", webpFile);
+
+    return fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
     });
-    if (!putRes.ok) {
-      throw new ApiError(`Photo upload failed with status ${putRes.status}`, putRes.status);
+  };
+
+  let res = await sendUpload(accessToken);
+
+  if (res.status === 401) {
+    const refreshed = await tryRefreshTokens();
+    if (refreshed) {
+      res = await sendUpload(refreshed);
     }
   }
-  return presign.publicUrl;
+
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+
+  return (await res.json()) as MediaUploadResult;
 }
 
 export const authApi = {
@@ -256,12 +342,8 @@ export const productsApi = {
   listMine: () =>
     apiFetch<PagedResult<Product>>("/api/products/mine", { auth: true }),
 
-  createUploadUrl: (fileName: string, contentType: string) =>
-    apiFetch<PresignedUploadResult>("/api/products/upload-url", {
-      method: "POST",
-      auth: true,
-      body: JSON.stringify({ fileName, contentType }),
-    }),
+  uploadImage: (file: File) =>
+    uploadMultipartImage("/api/products/images", file),
 
   create: (payload: {
     category: string;
@@ -289,6 +371,7 @@ export const productsApi = {
       availableStockKg?: number;
       minOrderKg?: number;
       basePricePerKg?: number;
+      imageUrls?: string[];
       priceTiers?: { minQuantityKg: number; pricePerKg: number }[];
       isActive?: boolean;
       rowVersion?: number;
@@ -349,12 +432,8 @@ export const ordersApi = {
       body: JSON.stringify({ accept }),
     }),
 
-  createProofUploadUrl: (id: string, fileName: string, contentType: string) =>
-    apiFetch<PresignedUploadResult>(`/api/orders/${id}/proof-upload-url`, {
-      method: "POST",
-      auth: true,
-      body: JSON.stringify({ fileName, contentType }),
-    }),
+  uploadProofPhoto: (id: string, file: File) =>
+    uploadMultipartImage(`/api/orders/${id}/proof-photo`, file),
 
   reconcile: (
     id: string,

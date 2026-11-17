@@ -14,7 +14,7 @@ Frontend web application for **AgroMarket** — a B2B direct agricultural market
 
 - `/` — **Produce Catalog & Multi-Farmer Morning Cart:** Filter regional/organic produce, automatic volume tier pricing, and consolidated checkout across multiple farms.
 - `/login` — **Passwordless Phone OTP Authentication:** E.164 phone number login and registration for Restaurants and Farmers.
-- `/farmer` — **Farmer Hub:** Publish and edit harvest listings, manage stock & volume price tiers, and upload produce photos via presigned URLs.
+- `/farmer` — **Farmer Hub:** Publish and edit harvest listings, manage stock & volume price tiers, and upload produce photos (automatically converted from PNG/JPG/JPEG to WebP and stored in PostgreSQL).
 - `/orders` — **Order Management & Consolidated B2B Invoices:**
   - Farmers accept/reject incoming orders and reconcile self-delivery weights.
   - Restaurants track multi-farmer checkout groups, review/approve or dispute doorstep scale weights, print consolidated statements, and trigger 1-click repeat orders.

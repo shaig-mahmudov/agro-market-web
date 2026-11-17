@@ -153,6 +153,22 @@ export default function OrdersPage() {
     setReconcilingOrderId(order.id);
   }
 
+  async function handleUploadFarmerProofPhoto(orderId: string, idx: number, file: File | null) {
+    if (!file) return;
+    setError(null);
+    try {
+      const uploaded = await ordersApi.uploadProofPhoto(orderId, file);
+      setReconcileDrafts((prev) => ({
+        ...prev,
+        [orderId]: (prev[orderId] ?? []).map((r, i) =>
+          i === idx ? { ...r, proofUrl: uploaded.url } : r
+        ),
+      }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to upload scale proof photo.");
+    }
+  }
+
   async function handleSubmitFarmerReconcile(order: Order) {
     const drafts = reconcileDrafts[order.id];
     if (!drafts || drafts.length !== order.items.length) return;
@@ -348,20 +364,34 @@ export default function OrdersPage() {
                               }
                               className="rounded-lg border border-[#D4DFD7] px-2 py-1"
                             />
-                            <input
-                              type="url"
-                              placeholder="Proof photo URL (optional)"
-                              value={reconcileDrafts[order.id][idx]?.proofUrl ?? ""}
-                              onChange={(e) =>
-                                setReconcileDrafts((prev) => ({
-                                  ...prev,
-                                  [order.id]: prev[order.id].map((r, i) =>
-                                    i === idx ? { ...r, proofUrl: e.target.value } : r
-                                  ),
-                                }))
-                              }
-                              className="rounded-lg border border-[#D4DFD7] px-2 py-1"
-                            />
+                            <div className="space-y-1">
+                              <input
+                                type="file"
+                                accept="image/webp,image/jpeg,image/png,.png,.jpg,.jpeg,.webp"
+                                onChange={(e) =>
+                                  void handleUploadFarmerProofPhoto(
+                                    order.id,
+                                    idx,
+                                    e.target.files?.[0] ?? null
+                                  )
+                                }
+                                className="w-full rounded-lg border border-[#D4DFD7] px-2 py-1 text-[11px]"
+                              />
+                              <input
+                                type="url"
+                                placeholder="Proof photo URL (optional)"
+                                value={reconcileDrafts[order.id][idx]?.proofUrl ?? ""}
+                                onChange={(e) =>
+                                  setReconcileDrafts((prev) => ({
+                                    ...prev,
+                                    [order.id]: prev[order.id].map((r, i) =>
+                                      i === idx ? { ...r, proofUrl: e.target.value } : r
+                                    ),
+                                  }))
+                                }
+                                className="w-full rounded-lg border border-[#D4DFD7] px-2 py-1"
+                              />
+                            </div>
                           </div>
                         ))}
                         <div className="flex justify-end">
