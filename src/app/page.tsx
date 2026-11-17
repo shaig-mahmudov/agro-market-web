@@ -37,7 +37,6 @@ export default function CatalogPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
   const [isOrganic, setIsOrganic] = useState(false);
 
@@ -75,13 +74,10 @@ export default function CatalogPage() {
 
   useEffect(() => {
     let active = true;
-    const searchedCategory = categoryForSearch(search);
-    const catalogCategory = category || searchedCategory;
     productsApi
       .listCatalog({
-        category: catalogCategory || undefined,
         region: region || undefined,
-        search: searchedCategory ? undefined : search || undefined,
+        search: search || undefined,
         isOrganic: isOrganic || undefined,
         page,
         pageSize: 12,
@@ -112,7 +108,7 @@ export default function CatalogPage() {
     return () => {
       active = false;
     };
-  }, [category, region, search, isOrganic, page]);
+  }, [region, search, isOrganic, page]);
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -185,11 +181,11 @@ export default function CatalogPage() {
                 key={cat || "all"}
                 type="button"
                 onClick={() => {
-                  setCategory(cat);
+                  setSearch(cat);
                   setPage(1);
                 }}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  category === cat
+                  (cat ? categoryForSearch(search) === cat : !search)
                     ? "bg-[#1B4332] text-white"
                     : "bg-[#F1F5F2] text-[#1F2933] hover:bg-[#D8F3DC]"
                 }`}
