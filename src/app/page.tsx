@@ -11,6 +11,17 @@ import type { FulfillmentType, PaymentMethod, Product } from "@/lib/types";
 
 const CATEGORIES = ["", "Tomatoes", "Cucumbers", "Potatoes", "Greens", "Fruits", "Onions"];
 
+function categoryForSearch(value: string) {
+  const normalized = value.trim().toLocaleLowerCase();
+  if (!normalized) return undefined;
+
+  return CATEGORIES.find((category) => {
+    if (!category) return false;
+    const categoryName = category.toLocaleLowerCase();
+    return categoryName === normalized || categoryName.slice(0, -1) === normalized;
+  });
+}
+
 export default function CatalogPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -64,11 +75,13 @@ export default function CatalogPage() {
 
   useEffect(() => {
     let active = true;
+    const searchedCategory = categoryForSearch(search);
+    const catalogCategory = category || searchedCategory;
     productsApi
       .listCatalog({
-        category: category || undefined,
+        category: catalogCategory || undefined,
         region: region || undefined,
-        search: search || undefined,
+        search: searchedCategory ? undefined : search || undefined,
         isOrganic: isOrganic || undefined,
         page,
         pageSize: 12,
